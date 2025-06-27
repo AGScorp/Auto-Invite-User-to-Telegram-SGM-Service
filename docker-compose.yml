@@ -1,0 +1,57 @@
+# Docker Compose version - กำหนด syntax และ features ที่ใช้ได้
+version: '3.8'
+
+services:
+  telegram-api:
+    # Build configuration - การสร้าง Docker image
+    build:
+      context: .                    # Path ที่มี Dockerfile (. = current directory)
+      dockerfile: dockerfile        # ชื่อไฟล์ Dockerfile ที่จะใช้ build
+    
+    # ชื่อ container เมื่อ run (ต้องไม่ซ้ำกับ container อื่น)
+    container_name: telegram-invitation-api
+    
+    # Restart policy - กำหนดเมื่อไหร่ที่ container จะ restart อัตโนมัติ
+    # unless-stopped = restart เสมอ ยกเว้นถูกหยุดด้วย manual command
+    restart: unless-stopped
+    
+    # Port mapping - เชื่อมต่อ port ระหว่าง host:container
+    # format: "host_port:container_port"
+    ports:
+      - "8200:8200"   # เข้าถึง API ผ่าน http://localhost:8200
+    
+    # Volume mounting - เชื่อมต่อไฟล์/โฟลเดอร์ระหว่าง host กับ container
+    volumes:
+      # Mount .env file - ไฟล์ config จาก host
+      - ./.env:/app/.env
+      # Mount sessions directory - เก็บ session files แบบ persistent
+      - ./sessions:/app/sessions
+    
+    # Environment variables - ตั้งค่า environment ใน container
+    environment:
+      - PYTHONUNBUFFERED=1      # Python print output ทันที ไม่ buffer
+      - TZ=Asia/Bangkok         # Timezone ของ container
+    
+    # Health check - ตรวจสอบสถานะ container ว่ายังทำงานปกติหรือไม่
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/"]  # คำสั่งตรวจสอบ
+      interval: 30s       # ตรวจสอบทุก 30 วินาที
+      timeout: 10s        # รอผลลัพธ์สูงสุด 10 วินาที
+      retries: 3          # ลองใหม่ 3 ครั้งก่อนถือว่า unhealthy
+      start_period: 40s   # รอ 40 วินาทีหลัง start ก่อนเริ่มตรวจ
+    
+    # Logging configuration - จัดการ log files
+    logging:
+      driver: "json-file"       # ใช้ JSON format สำหรับ logs
+      options:
+        max-size: "10m"         # ขนาดสูงสุดต่อไฟล์ log = 10 MB
+        max-file: "5"           # เก็บไฟล์ log ไว้สูงสุด 5 ไฟล์ (รวม 50 MB)
+    
+    # Networks - เชื่อมต่อ container เข้ากับ network
+    networks:
+      - telegram-network
+
+# Network definitions - กำหนด custom networks
+networks:
+  telegram-network:
+    driver: bridge    # Bridge network - default type สำหรับ containers บน host เดียวกัน
